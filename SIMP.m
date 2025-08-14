@@ -2,20 +2,25 @@
 %%%% CODE MODIFIED FOR INCREASED SPEED, September 2002, BY OLE SIGMUND %%%
 function SIMP(nelx,nely,volfrac,penal,rmin,newF,problem) 
     
-  % nelx ⇾ number of elements in direction X
-  % nely ⇾ number of elements in direction Y
-  % volfrac ⇾ volume fraction (minimum volume in % to be achieved)
-  % penal ⇾ SIMP penalty factor (usually between 3 and 4) x^penal
-  % rmin ⇾ filtering radius to smooth sensitivity (avoids irregular patterns)
-  % newF ⇾ value and direction of the applied force
-  % problem ⇾ type of problem that define boundary conditions and loading
+  %{
+  nelx ⇾ number of elements in direction X
+  nely ⇾ number of elements in direction Y
+  volfrac ⇾ volume fraction (minimum volume in % to be achieved)
+  penal ⇾ SIMP penalty factor (usually between 3 and 4) x^penal
+  rmin ⇾ filtering radius to smooth sensitivity (avoids irregular patterns)
+  newF ⇾ value and direction of the applied force
+  problem ⇾ type of problem that define boundary conditions and loading
+  %}
 
+  
 %   ================================ CALL EXAMPLES ==================================
-% CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,1)
-% CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,2)
-% CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,3)
-% VIGA-MBB: SIMP(120,20,0.40,3,1.5,-1,4)
-% MICHELL: SIMP(100,50,0.40,3,1.5,-1,5)
+%{ 
+CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,1)
+CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,2)
+CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,3)
+VIGA-MBB: SIMP(120,20,0.40,3,1.5,-1,4)
+MICHELL: SIMP(100,50,0.40,3,1.5,-1,5)
+%}
 
 
 %   ================================= INITIALIZE ====================================
@@ -77,6 +82,21 @@ while change > 0.01
         % Binary contour
         figure(1); contourf(x,[0,0]);
         colormap(gray);imagesc(-x); axis equal;  axis tight; axis off; pause(1e-6);
+
+        % Frame capture
+        frame = getframe(gcf)
+        img = frame2im(frame)
+        [imind,cm] = rgb2ind(img,256);
+
+        % GIF filename
+        gifFile = '1.gif' %%% Set the filename
+
+        % Write to GIF
+        if loop == 1
+          imwrite(imind, cm, gifFile, 'gif', 'Loopcount', inf, 'Delaytime', 0.2);
+        else
+          imwrite(imind, cm, gifFile, 'gif', 'WriteMode', 'append', 'Delaytime', 0.2);
+        end
 
         % 3D density plot
         figure(2); surf(x); caxis([-12,12]); 
