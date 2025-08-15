@@ -38,6 +38,10 @@ while change > 0.01
   loop = loop + 1;
   xold = x;
 
+  % Save the matrix in .txt
+  finalMatrix = x;
+  writematrix(finalMatrix, '1.txt', 'Delimiter', ','); % Export with comma tabulation
+
 
 %   ================================= FE-ANALYSIS ===================================
   [U]=FE(nelx,nely,x,penal,newF,problem); % Calculates U displacements
