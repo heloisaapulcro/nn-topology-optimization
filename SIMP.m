@@ -26,6 +26,7 @@ MICHELL: SIMP(100,50,0.40,3,1.5,-1,5)
 %   ================================= INITIALIZE ====================================
 tic % Timer
 x(1:nely,1:nelx) = volfrac; % Density matrix
+filename = '1.gif'; % Change the filename
 loop = 0;
 change = 1.;
 i=1;
@@ -82,21 +83,7 @@ while change > 0.01
         % Binary contour
         figure(1); contourf(x,[0,0]);
         colormap(gray);imagesc(-x); axis equal;  axis tight; axis off; pause(1e-6);
-
-        % Frame capture
-        frame = getframe(gcf)
-        img = frame2im(frame)
-        [imind,cm] = rgb2ind(img,256);
-
-        % GIF filename
-        gifFile = '1.gif' %%% Set the filename
-
-        % Write to GIF
-        if loop == 1
-          imwrite(imind, cm, gifFile, 'gif', 'Loopcount', inf, 'Delaytime', 0.2);
-        else
-          imwrite(imind, cm, gifFile, 'gif', 'WriteMode', 'append', 'Delaytime', 0.2);
-        end
+        exportgraphics(gcf, filename, 'Append', true); % Save the GIF file
 
         % 3D density plot
         figure(2); surf(x); caxis([-12,12]); 
