@@ -1,7 +1,7 @@
 %%%% A 99 LINE TOPOLOGY OPTIMIZATION CODE BY OLE SIGMUND, JANUARY 2000 %%%
 %%%% CODE MODIFIED FOR INCREASED SPEED, September 2002, BY OLE SIGMUND %%%
-function SIMP(nelx,nely,volfrac,penal,rmin,newF,problem, geometry) 
-    
+
+function SIMP(nelx,nely,volfrac,penal,rmin,newF,problem, geometry)   
 %{
   nelx ⇾ number of elements in direction X
   nely ⇾ number of elements in direction Y
@@ -27,7 +27,6 @@ function SIMP(nelx,nely,volfrac,penal,rmin,newF,problem, geometry)
 %   ================================= INITIALIZE ====================================
 tic % Timer
 x(1:nely,1:nelx) = volfrac; % Density matrix (all elements start with the value of volfrac)
-filename = '1.gif'; % Change the filename
 loop = 0;
 change = 1.;
 i=1;
@@ -59,21 +58,23 @@ if geometry == 4
 end
 mask=x;
 
+% Save the results with date and hour in name
+outputName = sprintf('resultado_%s', datestr(now,'yyyymmdd_HHMMSS'));
+
+% Save initial matrix
+txtNameInitial = sprintf('%s_inicial.txt', outputName);
+writematrix(x, txtNameInitial, 'Delimiter', ',');
+gifName = sprintf('%s.gif', outputName);
+
 %   ======================== START ITERATION ⇾ OPTIMIZATION =========================
 while change > 0.01 
   i=i+1;
   loop = loop + 1;
   xold = x;
 
-  % Save the matrix in .txt
-  finalMatrix = x;
-  writematrix(finalMatrix, '1.txt', 'Delimiter', ','); % Export with comma tabulation
-
-
 %   ================================= FE-ANALYSIS ===================================
   [U]=FE(nelx,nely,x,penal,newF,problem); % Calculates U displacements
-  
-  
+   
 %   ================= OBJECTIVE FUNCTION AND SENSITIVITY ANALYSIS ===================
   [KE] = lk; % Element stiffness matrix
   c(i) = 0.; % Objective function (compliance) <compliance = >stiffness
@@ -99,7 +100,7 @@ while change > 0.01
 %   ============================== SENSITIVITY FILTER ===============================
  [dc]   = check(nelx,nely,rmin,x,dc);  
 
- % Updates density by optimality criterion
+% Updates density by optimality criterion
  vol(i)=sum(sum(x))/(nelx*nely);
  [x]    = OC(nelx,nely,x,volfrac,dc,mask);
 
@@ -114,7 +115,7 @@ while change > 0.01
         % Binary contour
         figure(1); contourf(x,[0,0]);
         colormap(gray);imagesc(-x); axis equal;  axis tight; axis off; pause(1e-6);
-        exportgraphics(gcf, filename, 'Append', true); % Save the GIF file
+        exportgraphics(gcf, gifName, "Append", true); % Save the GIF file
 
         % 3D density plot
         figure(2); surf(x); caxis([-12,12]); 
@@ -124,9 +125,22 @@ while change > 0.01
         figure(3); subplot(2,1,1); plot(c(1:i),'-'); title('Compliance');
                    subplot(2,1,2); plot(vol(1:i),'-'); title('Volume fraction');
 end 
-
 toc % End timer
 
+% ============================== EXPORT FINAL RESULTS ===============================
+finalMatrix = x;
+
+txtName = sprintf('%s.txt', outputName);
+gifName = sprintf('%s.gif', outputName);
+
+writematrix(x, txtName, 'Delimiter', ',');
+
+disp('---------------------------------------------');
+disp(['Arquivos salvos com sucesso:']);
+disp([' - Matriz inicial: ' txtNameInitial]);
+disp([' - Matriz final:   ' txtName]);
+disp([' - Figura final:   ' gifName]);
+disp('---------------------------------------------');
 
 %   ============================= AUXILIARY FUNCTIONS ===============================
 %%% Optimality Criteria (OC)
@@ -139,6 +153,7 @@ while (l2-l1 > 1e-4)
 
   % Updates densities respecting movement limits
   xnew = max(0.001,max(x-move,min(1.,min(x+move,x.*sqrt(-dc./lmid)))));
+  xnew(mask < 0.1) = 0.001
 
   % Adjust Lagrange multipliers to meet volume constraints
   if sum(sum(xnew)) - volfrac*nelx*nely > 0;
@@ -147,7 +162,6 @@ while (l2-l1 > 1e-4)
     l2 = lmid;
   end
 end
-
 
 %%% Mesh independence filter (check)
 function [dcn]=check(nelx,nely,rmin,x,dc)
@@ -190,6 +204,7 @@ end
 
 
 %   ================================== PROBLEMS ===================================== 
+% Define boundary conditions and loading for each case
 
 %%% CANTILEVER
    if problem == 1
@@ -203,7 +218,6 @@ end
         U(fixeddofs,:)= 0;
    end
 %   =================================================================================
-
 %%% REVERSED FRENCH HAND
    if problem == 2
         Name='MÃO FRANCESA INVERTIDA';
@@ -215,7 +229,6 @@ end
         U(fixeddofs,:)= 0;
    end
 %   =================================================================================
-
 %%% FRENCH HAND
    if problem == 3
         Name='MÃO FRANCESA';
@@ -227,7 +240,6 @@ end
         U(fixeddofs,:)= 0;
    end
 %   =================================================================================
-
 %%% BEAM MBB
    if problem == 4
         Name='VIGA MBB';
@@ -239,7 +251,6 @@ end
         U(fixeddofs,:)= 0;
    end
 %   =================================================================================
-
 %%% MICHELL
    if problem == 5
         Name='MICHELL';
@@ -292,3 +303,4 @@ KE = E/(1-nu^2)*[ k(1) k(2) k(3) k(4) k(5) k(6) k(7) k(8)
 % free from errors. Furthermore, he shall not be liable in any event       %
 % caused by the use of the program.                                        %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
