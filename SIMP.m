@@ -1,8 +1,8 @@
 %%%% A 99 LINE TOPOLOGY OPTIMIZATION CODE BY OLE SIGMUND, JANUARY 2000 %%%
 %%%% CODE MODIFIED FOR INCREASED SPEED, September 2002, BY OLE SIGMUND %%%
-function SIMP(nelx,nely,volfrac,penal,rmin,newF,problem) 
+function SIMP(nelx,nely,volfrac,penal,rmin,newF,problem, geometry) 
     
-  %{
+%{
   nelx ⇾ number of elements in direction X
   nely ⇾ number of elements in direction Y
   volfrac ⇾ volume fraction (minimum volume in % to be achieved)
@@ -10,27 +10,54 @@ function SIMP(nelx,nely,volfrac,penal,rmin,newF,problem)
   rmin ⇾ filtering radius to smooth sensitivity (avoids irregular patterns)
   newF ⇾ value and direction of the applied force
   problem ⇾ type of problem that define boundary conditions and loading
-  %}
+  geometry ⇾ beam geometry type
+%}
 
   
 %   ================================ CALL EXAMPLES ==================================
 %{ 
-CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,1)
-CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,2)
-CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,3)
-VIGA-MBB: SIMP(120,20,0.40,3,1.5,-1,4)
-MICHELL: SIMP(100,50,0.40,3,1.5,-1,5)
+  CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,1) --- Force at midpoint
+  CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,2) --- Force at the upper end
+  CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,3) --- Force at the lower end
+  VIGA-MBB: SIMP(120,20,0.40,3,1.5,-1,4) --- Doubly supported beam with force at the upper end
+  MICHELL: SIMP(100,50,0.40,3,1.5,-1,5) --- Doubly supported beam with force at the lower end
 %}
 
 
 %   ================================= INITIALIZE ====================================
 tic % Timer
-x(1:nely,1:nelx) = volfrac; % Density matrix
+x(1:nely,1:nelx) = volfrac; % Density matrix (all elements start with the value of volfrac)
 filename = '1.gif'; % Change the filename
 loop = 0;
 change = 1.;
 i=1;
 
+% Geometry definition
+% R
+if geometry == 1
+    x(1:nely,1:nelx) = volfrac;
+end
+
+% L
+if geometry == 2
+    % Lower right rectangular void
+    x(ceil(nely/2):nely, ceil(nelx/2):nelx) = 0.001;
+end
+
+% T
+if geometry == 3
+    % Lower left rectangular void
+    x(ceil(nely/2):nely, 1:ceil(nelx/4)) = 0.001; 
+    % Lower right rectangular void
+    x(ceil(nely/2):nely, nelx-ceil(nelx/4):nelx) = 0.001; 
+end
+
+% U
+if geometry == 4
+    % Lower rectangular void
+    x(ceil(nely/2):nely, ceil(nelx/4):nelx-ceil(nelx/4)) = 0.001;
+end
+mask=x;
 
 %   ======================== START ITERATION ⇾ OPTIMIZATION =========================
 while change > 0.01 
@@ -74,7 +101,7 @@ while change > 0.01
 
  % Updates density by optimality criterion
  vol(i)=sum(sum(x))/(nelx*nely);
- [x]    = OC(nelx,nely,x,volfrac,dc);
+ [x]    = OC(nelx,nely,x,volfrac,dc,mask);
 
 
 %   =========================== PLOTS AND RESULTS - BESO ============================
@@ -103,7 +130,7 @@ toc % End timer
 
 %   ============================= AUXILIARY FUNCTIONS ===============================
 %%% Optimality Criteria (OC)
-function [xnew]=OC(nelx,nely,x,volfrac,dc) 
+function [xnew]=OC(nelx,nely,x,volfrac,dc.mask) 
   
 % Updatss the density of each element to improve structural performance
 l1 = 0; l2 = 100000; move = 0.2; % Bisection method
