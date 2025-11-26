@@ -56,7 +56,7 @@ if geometry == 4
 end
 mask=x;
 
-% Save the results with date and hour in name
+% Save the results with parameters in name
 outputName = sprintf('r_nx%d_ny%d_V%.2f_p%d_rm%.2f_F%.2f_P%d_G%d', ...
     nelx, nely, volfrac, penal, rmin, newF, problem, geometry);
 
@@ -308,4 +308,5 @@ KE = E/(1-nu^2)*[ k(1) k(2) k(3) k(4) k(5) k(6) k(7) k(8)
 % The author reserves all rights but does not guaranty that the code is    %
 % free from errors. Furthermore, he shall not be liable in any event       %
 % caused by the use of the program.                                        %
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
