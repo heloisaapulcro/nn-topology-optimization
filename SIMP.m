@@ -1,34 +1,32 @@
 %%%% A 99 LINE TOPOLOGY OPTIMIZATION CODE BY OLE SIGMUND, JANUARY 2000 %%%
 %%%% CODE MODIFIED FOR INCREASED SPEED, September 2002, BY OLE SIGMUND %%%
 
-function SIMP(nelx,nely,volfrac,penal,rmin,newF,problem, geometry)   
+function SIMP(nelx,nely,volfrac,penal,rmin,newF,problem,geometry) 
 %{
-  nelx ⇾ number of elements in direction X
-  nely ⇾ number of elements in direction Y
-  volfrac ⇾ volume fraction (minimum volume in % to be achieved)
-  penal ⇾ SIMP penalty factor (usually between 3 and 4) x^penal
-  rmin ⇾ filtering radius to smooth sensitivity (avoids irregular patterns)
-  newF ⇾ value and direction of the applied force
-  problem ⇾ type of problem that define boundary conditions and loading
-  geometry ⇾ beam geometry type
+    nelx ⇾ number of elements in direction X
+    nely ⇾ number of elements in direction Y
+    volfrac ⇾ volume fraction (minimum volume in % to be achieved)
+    penal ⇾ SIMP penalty factor (usually between 3 and 4) x^penal
+    rmin ⇾ filtering radius to smooth sensitivity (avoids irregular patterns)
+    newF ⇾ value and direction of the applied force
+    problem ⇾ type of problem that define boundary conditions and loading
+    geometry ⇾ beam geometry type
+
+%   ======================== PROBLEMS DEFINITION ==========================
+1. CANTILEVER:  FORCE AT MIDPOINT 
+2. CANTILEVER:  FORCE AT THE UPPER END
+3. CANTILEVER:  FORCE AT THE LOWER END
+4. VIGA-MBB:    DOUBLY SUPPORTED BEAM WITH FORCE AT THE UPPER END
+5. MICHELL:     DOUBLY SUPPORTED BEAM WITH FORCE AT THE LOWER END
 %}
 
-  
-%   ================================ CALL EXAMPLES ==================================
-%{ 
-  CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,1) --- Force at midpoint
-  CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,2) --- Force at the upper end
-  CANTILEVER: SIMP(64,40,0.40,3,1.5,-1,3) --- Force at the lower end
-  VIGA-MBB: SIMP(120,20,0.40,3,1.5,-1,4) --- Doubly supported beam with force at the upper end
-  MICHELL: SIMP(100,50,0.40,3,1.5,-1,5) --- Doubly supported beam with force at the lower end
-%}
-
-
-%   ================================= INITIALIZE ====================================
+%   =========================== INITIALIZE ================================
 tic % Timer
-x(1:nely,1:nelx) = volfrac; % Density matrix (all elements start with the value of volfrac)
+x(1:nely,1:nelx) = volfrac;
+% Density matrix (all elements start with the value of volfrac)
+
 loop = 0;
-change = 1.;
+change = 1.; % Initial maximum change
 i=1;
 
 % Geometry definition
@@ -59,53 +57,56 @@ end
 mask=x;
 
 % Save the results with date and hour in name
-outputName = sprintf('resultado_%s', datestr(now,'yyyymmdd_HHMMSS'));
+outputName = sprintf('r_nx%d_ny%d_V%.2f_p%d_rm%.2f_F%.2f_P%d_G%d', ...
+    nelx, nely, volfrac, penal, rmin, newF, problem, geometry);
 
 % Save initial matrix
 txtNameInitial = sprintf('%s_inicial.txt', outputName);
 writematrix(x, txtNameInitial, 'Delimiter', ',');
+
 gifName = sprintf('%s.gif', outputName);
 
-%   ======================== START ITERATION ⇾ OPTIMIZATION =========================
+%   =================== START ITERATION ⇾ OPTIMIZATION ===================
 while change > 0.01 
   i=i+1;
   loop = loop + 1;
-  xold = x;
+  xold = x; % Save previous configuration
 
-%   ================================= FE-ANALYSIS ===================================
+%   =========================== FE-ANALYSIS ===============================
   [U]=FE(nelx,nely,x,penal,newF,problem); % Calculates U displacements
-   
-%   ================= OBJECTIVE FUNCTION AND SENSITIVITY ANALYSIS ===================
+  
+
+%   ============= OBJECTIVE FUNCTION AND SENSITIVITY ANALYSIS =============
   [KE] = lk; % Element stiffness matrix
-  c(i) = 0.; % Objective function (compliance) <compliance = >stiffness
+  c(i) = 0.; % Objective function (compliance) < compliance = > stiffness
   vol(i)=0.;
   for ely = 1:nely
     for elx = 1:nelx
       % Element nodes in the mesh
       n1 = (nely+1)*(elx-1)+ely; 
       n2 = (nely+1)* elx   +ely;
-
+      
       % Degress of freedom of the elements (2* = 2 degressof freedom)
       Ue = U([2*n1-1;2*n1; 2*n2-1;2*n2; 2*n2+1;2*n2+2; 2*n1+1;2*n1+2],1);
-
+      
       % Compliance sum
       c(i) = c(i) + x(ely,elx)^penal*Ue'*KE*Ue;
-
+      
       % Sensitivity of the objective function in relation to density
       dc(ely,elx) = -penal*x(ely,elx)^(penal-1)*Ue'*KE*Ue;
     end
   end
 
 
-%   ============================== SENSITIVITY FILTER ===============================
+%   ========================= SENSITIVITY FILTER ==========================
  [dc]   = check(nelx,nely,rmin,x,dc);  
-
+ 
 % Updates density by optimality criterion
- vol(i)=sum(sum(x))/(nelx*nely);
- [x]    = OC(nelx,nely,x,volfrac,dc,mask);
-
-
-%   =========================== PLOTS AND RESULTS - BESO ============================
+ vol(i) = sum(sum(x))/(nelx*nely);
+ [x] = OC(nelx,nely,x,volfrac,dc,mask);
+ 
+ 
+%   ====================== PLOTS AND RESULTS - BESO ======================= 
 % Convergence check
   change = max(max(abs(x-xold)));
   disp([' It.: ' sprintf('%4i',loop) ' Obj.: ' sprintf('%10.4f',c(i)) ...
@@ -115,25 +116,26 @@ while change > 0.01
         % Binary contour
         figure(1); contourf(x,[0,0]);
         colormap(gray);imagesc(-x); axis equal;  axis tight; axis off; pause(1e-6);
-        exportgraphics(gcf, gifName, "Append", true); % Save the GIF file
-
+        exportgraphics(gcf, gifName, "Append", true);
+          
         % 3D density plot
         figure(2); surf(x); caxis([-12,12]); 
         axis equal; axis([0,nelx,0,nely,-12,12]); view(3);
-
+        
         % Objective function and volume history
         figure(3); subplot(2,1,1); plot(c(1:i),'-'); title('Compliance');
                    subplot(2,1,2); plot(vol(1:i),'-'); title('Volume fraction');
 end 
-toc % End timer
-
-% ============================== EXPORT FINAL RESULTS ===============================
+toc
+% ========================== EXPORT FINAL RESULTS =========================
 finalMatrix = x;
 
-txtName = sprintf('%s.txt', outputName);
+txtName = sprintf('%s_final.txt', outputName);
 gifName = sprintf('%s.gif', outputName);
 
+% Salva matriz final
 writematrix(x, txtName, 'Delimiter', ',');
+
 
 disp('---------------------------------------------');
 disp(['Arquivos salvos com sucesso:']);
@@ -142,19 +144,20 @@ disp([' - Matriz final:   ' txtName]);
 disp([' - Figura final:   ' gifName]);
 disp('---------------------------------------------');
 
-%   ============================= AUXILIARY FUNCTIONS ===============================
+
+%   ======================== AUXILIARY FUNCTIONS ==========================
 %%% Optimality Criteria (OC)
-function [xnew]=OC(nelx,nely,x,volfrac,dc.mask) 
-  
+function [xnew]=OC(nelx,nely,x,volfrac,dc,mask)
+    
 % Updatss the density of each element to improve structural performance
 l1 = 0; l2 = 100000; move = 0.2; % Bisection method
 while (l2-l1 > 1e-4)
   lmid = 0.5*(l2+l1);
-
+  
   % Updates densities respecting movement limits
   xnew = max(0.001,max(x-move,min(1.,min(x+move,x.*sqrt(-dc./lmid)))));
   xnew(mask < 0.1) = 0.001
-
+  
   % Adjust Lagrange multipliers to meet volume constraints
   if sum(sum(xnew)) - volfrac*nelx*nely > 0;
     l1 = lmid;
@@ -182,7 +185,6 @@ for i = 1:nelx
   end
 end
 
-
 %%% Finite elements analysis
 function [U]=FE(nelx,nely,x,penal,newF,problem)
 [KE] = lk;
@@ -203,54 +205,61 @@ for elx = 1:nelx
 end
 
 
-%   ================================== PROBLEMS ===================================== 
+%   ============================= PROBLEMS ================================ 
 % Define boundary conditions and loading for each case
 
 %%% CANTILEVER
    if problem == 1
         Name='CANTILEVER';
         F(2*(nelx+1)*(nely+1)-nely,1) = newF; % Force at midpoint
-        fixeddofs   = (1:2*(nely+1)); 
-        alldofs     = (1:2*(nely+1)*(nelx+1));
-        freedofs    = setdiff(alldofs,fixeddofs);
+        fixeddofs = (1:2*(nely+1)); 
+        alldofs = (1:2*(nely+1)*(nelx+1));
+        freedofs = setdiff(alldofs,fixeddofs);
         % SOLVING
         U(freedofs,:) = K(freedofs,freedofs) \ F(freedofs,:);      
         U(fixeddofs,:)= 0;
    end
-%   =================================================================================
+%   =======================================================================
+
 %%% REVERSED FRENCH HAND
    if problem == 2
         Name='MÃO FRANCESA INVERTIDA';
         F(2*(nelx)*(nely+1)+2,1) = newF; % Force at the upper end
-        fixeddofs   = (1:2*(nely+1)); 
-        alldofs     = (1:2*(nely+1)*(nelx+1));
-        freedofs    = setdiff(alldofs,fixeddofs);
+        fixeddofs = (1:2*(nely+1)); 
+        alldofs = (1:2*(nely+1)*(nelx+1));
+        freedofs = setdiff(alldofs,fixeddofs);
+        % SOLVING
         U(freedofs,:) = K(freedofs,freedofs) \ F(freedofs,:);      
         U(fixeddofs,:)= 0;
    end
-%   =================================================================================
+%   =======================================================================
+
 %%% FRENCH HAND
    if problem == 3
         Name='MÃO FRANCESA';
-        F(2*(nelx+1)*(nely+1),1) = newF; % Force at the lower end
-        fixeddofs   = (1:2*(nely+1)); 
-        alldofs     = (1:2*(nely+1)*(nelx+1));
-        freedofs    = setdiff(alldofs,fixeddofs);
+        F(2*(nelx+1)*(nely+1),1) = newF; % Force at thelower end
+        fixeddofs = (1:2*(nely+1)); 
+        alldofs = (1:2*(nely+1)*(nelx+1));
+        freedofs = setdiff(alldofs,fixeddofs);
+        % SOLVING
         U(freedofs,:) = K(freedofs,freedofs) \ F(freedofs,:);      
         U(fixeddofs,:)= 0;
    end
-%   =================================================================================
+%   =======================================================================
+   
 %%% BEAM MBB
    if problem == 4
         Name='VIGA MBB';
         F(2*(nelx+1)*(nely+1)-nely,1) = newF; % Force at midpoint
-        fixeddofs   = (1:2*(nely+1)); 
-        alldofs     = (1:2*(nely+1)*(nelx+1));
-        freedofs    = setdiff(alldofs,fixeddofs);
+        fixeddofs = (1:2*(nely+1)); 
+        alldofs = (1:2*(nely+1)*(nelx+1));
+        freedofs = setdiff(alldofs,fixeddofs);
+        % SOLVING
         U(freedofs,:) = K(freedofs,freedofs) \ F(freedofs,:);      
         U(fixeddofs,:)= 0;
    end
-%   =================================================================================
+%   =======================================================================
+
 %%% MICHELL
    if problem == 5
         Name='MICHELL';
@@ -258,16 +267,16 @@ end
         fixeddofs = union(2*nely+1:2*(nely+1), 2*(nely+1)*(nelx+1));
         alldofs = (1:2*(nely+1)*(nelx+1));
         freedofs = setdiff(alldofs,fixeddofs);
+        % SOLVING
         U(freedofs,:) = K(freedofs,freedofs) \ F(freedofs,:);      
         U(fixeddofs,:)= 0;
    end
-%   =================================================================================
+%   =======================================================================
 
-
-%   =========================== ELEMENT RIGIDITY MATRIX =============================
+%   ====================== ELEMENT RIGIDITY MATRIX ========================
 function [KE]=lk
-E = 1.;
-nu = 0.3;
+E = 1.; % Modulus of elasticity
+nu = 0.3; % Poisson ratio
 
 % 8-node quadrilateral element matrix coefficients
 k=[ 1/2-nu/6   1/8+nu/8 -1/4-nu/12 -1/8+3*nu/8 ... 
@@ -280,9 +289,6 @@ KE = E/(1-nu^2)*[ k(1) k(2) k(3) k(4) k(5) k(6) k(7) k(8)
                   k(6) k(5) k(4) k(3) k(2) k(1) k(8) k(7)
                   k(7) k(4) k(5) k(2) k(3) k(8) k(1) k(6)
                   k(8) k(3) k(2) k(5) k(4) k(7) k(6) k(1)];
-
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % This Matlab code was written by Ole Sigmund, Department of Solid         %
@@ -303,4 +309,3 @@ KE = E/(1-nu^2)*[ k(1) k(2) k(3) k(4) k(5) k(6) k(7) k(8)
 % free from errors. Furthermore, he shall not be liable in any event       %
 % caused by the use of the program.                                        %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
